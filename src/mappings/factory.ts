@@ -27,17 +27,26 @@ import { store } from '@graphprotocol/graph-ts'
 
 export function _createFactory(event: VaultCreated): Factory {
   log.debug("CALL : _createFactory", []);
+
+  // load
   const factory = new Factory(FACTORY_ADDRESS);
+
+  // prevent error
+	if (factory === null) return;
+
+  // set
   factory.vaultCount = 0;
+
+  // ? bind
   const bindedFactory = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
 
-  // Tokens
+  // source binded factory data
   const tokens = bindedFactory.getWhitelistedTokens();
   const tokensArray = new Array<Bytes>(tokens.length);
   for (let x = 0; x < tokens.length; x++) tokensArray[x] = tokens[x];
   factory.tokens = tokensArray;
 
-  // Other Addresses
+  // source factory data
   factory.feesManager = bindedFactory.feesManager();
   factory.accessManager = bindedFactory.accessManager();
   factory.harvester = bindedFactory.harvester();
@@ -46,6 +55,8 @@ export function _createFactory(event: VaultCreated): Factory {
   factory.swapAdapter = bindedFactory.swapAdapter();
   factory.lastSnapshotBlockTimestamp = event.block.timestamp;
   factory.lastSnapshotBlockNumber = event.block.number;
+
+  // save
   factory.save();
 
   // -
@@ -62,65 +73,63 @@ export function _createFactory(event: VaultCreated): Factory {
 export const updateVault = (vault: Vault): Vault => {
   log.debug("CALL : updateVault", []);
 
-  // const vAddress = Address.fromString(vault.id)
+  // ? bind
   const bindedFactory = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
   const bindedVault = VaultContract.bind(Address.fromString(vault.id));
 
-  // Vault State
+  // source binded factory data
   const vaultState = bindedFactory.getVaultState(Address.fromString(vault.id));
-  // Share State
   const shareState = bindedFactory.getShareState(Address.fromString(vault.id));
 
-  // Update Vault Storage
+  // source binded vault data > tokens
   const tokensLength = bindedVault.tokensLength().toI32();
   const tokens = new Array<Bytes>(tokensLength);
   const tokensPriceFeedAddress = new Array<Bytes>(tokensLength); // String != string
   const tokensPriceFeedPrecision = new Array<BigInt>(tokensLength);
   const tokensDenominator = new Array<BigInt>(tokensLength);
-  for (let x = 0; x < tokensLength; x++) {
-    const tokenData = bindedVault.tokens(BigInt.fromI32(x));
-    tokens[x] = tokenData.value0
-    tokensPriceFeedAddress[x] = tokenData.value1;
-    tokensPriceFeedPrecision[x] = BigInt.fromI32(tokenData.value2);
-    tokensDenominator[x] = tokenData.value3;
+  for (let tIndex = 0; tIndex < tokensLength; tIndex++) {
+    const tokenData = bindedVault.tokens(BigInt.fromI32(tIndex));
+    tokens[tIndex] = tokenData.value0
+    tokensPriceFeedAddress[tIndex] = tokenData.value1;
+    tokensPriceFeedPrecision[tIndex] = BigInt.fromI32(tokenData.value2);
+    tokensDenominator[tIndex] = tokenData.value3;
   };
-
   vault.tokens = tokens;
   vault.tokensPriceFeedAddress = tokensPriceFeedAddress
   vault.tokensPriceFeedPrecision = tokensPriceFeedPrecision;
   vault.tokensDenominator = tokensDenominator;
 
-  // log.debug("CALL :  bindedFactory._address: {}", [bindedFactory._address.toHexString()]);
-  // log.debug("CALL :  bindedFactory._name: {}", [bindedFactory._name]);
-  // log.debug("CALL :  bindedFactory.harvester: {}", [bindedFactory.harvester().toHexString()]);
+  // legacy debug
+  // log.debug("CALL:  bindedFactory._address: {}", [bindedFactory._address.toHexString()]);
+  // log.debug("CALL:  bindedFactory._name: {}", [bindedFactory._name]);
+  // log.debug("CALL:  bindedFactory.harvester: {}", [bindedFactory.harvester().toHexString()]);
 
-  // Roles
+  // source binded vault data > roles
   const vaultRoles = bindedFactory.getRolesPerVault(Address.fromString(vault.id));
   const admins = new Array<Bytes>(vaultRoles.value1.length);
   const strategists = new Array<Bytes>(vaultRoles.value2.length);
   const harvesters = new Array<Bytes>(vaultRoles.value3.length);
-  for (let x = 0; x < vaultRoles.value1.length; x++) admins[x] = vaultRoles.value1[x];
-  for (let x = 0; x < vaultRoles.value2.length; x++) strategists[x] = vaultRoles.value2[x];
-  for (let x = 0; x < vaultRoles.value3.length; x++) harvesters[x] = vaultRoles.value3[x];
-
+  for (let rIndex = 0; rIndex < vaultRoles.value1.length; rIndex++) admins[rIndex] = vaultRoles.value1[rIndex];
+  for (let rIndex = 0; rIndex < vaultRoles.value2.length; rIndex++) strategists[rIndex] = vaultRoles.value2[rIndex];
+  for (let rIndex = 0; rIndex < vaultRoles.value3.length; rIndex++) harvesters[rIndex] = vaultRoles.value3[rIndex];
   vault.admins = admins;
   vault.strategists = strategists;
   vault.harvesters = harvesters;
 
-  // Config Props
+  // source binded vault data > config
   const configProps = bindedVault.getConfigProps();
   vault.paused = configProps.paused;
   vault.verified = configProps.verified;
   vault.name = configProps.name;
   vault.description = configProps.description;
 
-  // Constant Props
+  // source binded vault data > constants
   const constantProps = bindedVault.getConstantProps();
   vault.factoryAddress = constantProps.factory;
   vault.createdAt = constantProps.createdAt;
   vault.share = constantProps.share;
 
-  // Fees Props
+  // source binded vault data > fees
   const feesProps = bindedVault.getFeesProps();
   vault.beneficiary = feesProps.beneficiary; // Strange
   vault.exitFees = feesProps.exitFees;
@@ -129,14 +138,14 @@ export const updateVault = (vault: Vault): Vault => {
   vault.performanceFeesRate = feesProps.performanceFeesRate;
   vault.performanceFeesToStrategist = feesProps.performanceFeesToStrategist;
 
-  // History Props
+  // source binded vault data > history
   const historyProps = bindedVault.getHistoryProps();
   vault.highWaterMark = historyProps.highWaterMark;
   vault.prevRebalanceSignals = historyProps.prevRebalanceSignals;
   vault.prevSwap = historyProps.prevSwap;
   vault.prevMngHarvest = historyProps.prevMngHarvest;
 
-  // Security Props
+  // source binded vault data > security
   const securityProps = bindedVault.getSecurityProps();
   vault.maxAUM = securityProps.maxAUM;
   vault.maxLossSwap = securityProps.maxLossSwap;
@@ -146,7 +155,7 @@ export const updateVault = (vault: Vault): Vault => {
   vault.minSecurityTime = securityProps.minSecurityTime;
   vault.minHarvestThreshold = securityProps.minHarvestThreshold;
 
-  // State Left
+  // source binded vault data > fees compute
   const sharePrice = vaultState.value9;
   const pendingPerfFees = bindedVault.getPerformanceFees().value0;
   const pendingManagementFees = bindedVault.getManagementFees().value0;
@@ -160,7 +169,11 @@ export const updateVault = (vault: Vault): Vault => {
   vault.netSharePrice = (shareSupply == BigInt.fromI32(0)) ?  BigInt.fromI32(1) : sharePrice.times(shareSupply).div(shareSupply.plus(pendingManagementFees).plus(pendingPerfFees));
   vault.sharePriceNetFromMngFees = (shareSupply == BigInt.fromI32(0)) ? BigInt.fromI32(1) : sharePrice.times(shareSupply).div(shareSupply.plus(pendingManagementFees));
   vault.sharePriceNetFromPerfFees = (shareSupply == BigInt.fromI32(0)) ? BigInt.fromI32(1) : sharePrice.times(shareSupply).div(shareSupply.plus(pendingPerfFees));
+
+  // save
   vault.save();
+
+  // -
   return vault;
 }
 
@@ -171,8 +184,10 @@ export const updateVault = (vault: Vault): Vault => {
  */
 
 export function _createVault(event: VaultCreated, factory: Factory): Vault {
-  /// Factory Info
+  // ?
   let vault = new Vault(event.params.vault.toHexString()) as Vault;
+
+  // source vault data
   vault.factory = factory.id;
   vault.vault = event.params.vault;
   vault.creator = event.transaction.from;
@@ -187,8 +202,14 @@ export function _createVault(event: VaultCreated, factory: Factory): Vault {
   vault.netSharePrice = BigInt.fromI32(1);
   vault.sharePriceNetFromMngFees = BigInt.fromI32(1);
   vault.sharePriceNetFromPerfFees = BigInt.fromI32(1);
+
+  // -
   const updatedVault = updateVault(vault);
+
+  // -
   updatedVault.save();
+
+  // ?
   return vault;
 }
 
@@ -199,15 +220,29 @@ export function _createVault(event: VaultCreated, factory: Factory): Vault {
 
 export function handleCreateVault(event: VaultCreated): void {
   log.debug("CALL : handleCreateVault", []);
-  // Factory (created when the first vault is created)
+
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
+
+  // prevent error
   if (factory === null) factory = _createFactory(event);
+
+  // -
   factory.vaultCount = factory.vaultCount + 1;
+
+  // save
   factory.save();
-  // Vault
+
+  // -
   const vault = _createVault(event, factory);
+
+  // -
   VaultTemplate.create(event.params.vault);
+
+  // -
   vault.save();
+
+  // -
   factory.save();
 }
 
@@ -225,9 +260,19 @@ export function newSnapshot(
   block: ethereum.Block,
   triggeredByEvent: boolean,
 ): void {
+  // load
   const vault = VaultContract.bind(vaultAddress);
+
+  // prevent error
+	if (factory === null) return;
+
+  // load binded factory
   const bindedFactory = FactoryContract.bind(Address.fromString(factory.id));
+
+  // ? build name
   const entityName = FACTORY_ADDRESS + "-" + vaultAddress.toHexString() + "-" + block.number.toString();
+
+  // source vault data
   const status = vault.getVaultStatus();
   const tokensLength = vault.tokensLength().toI32();
   const assetsPrices = new Array<BigInt>(tokensLength);
@@ -237,14 +282,18 @@ export function newSnapshot(
   const pendingPerfFees = vault.getPerformanceFees().value0;
   const pendingManagementFees = vault.getManagementFees().value0;
   const shareSupply = shareState.value4;
-  for (let y = 0; y < tokensLength; y++) {
-    const asset = vault.tokens(BigInt.fromI32(y));
+  for (let tIndex = 0; tIndex < tokensLength; tIndex++) {
+    const asset = vault.tokens(BigInt.fromI32(tIndex));
     const price = vault.getLatestPrice(asset.value1);
-    assetsPrices[y] = price;
-    newTokens[y] = asset.value0;
+    assetsPrices[tIndex] = price;
+    newTokens[tIndex] = asset.value0;
   }
   const assetsBalances = vault.getVaultBalances();
+
+  // load
   const snapshot = new VaultSnapshot(entityName);
+
+  // source snapshot data
   snapshot.factory = factory.id;
   snapshot.vault = vaultAddress.toHexString();
   snapshot.assetsBalances = assetsBalances;
@@ -260,6 +309,8 @@ export function newSnapshot(
   snapshot.pendingMngFees = pendingManagementFees;
   snapshot.timestamp = block.timestamp;
   snapshot.triggeredByEvent = triggeredByEvent;
+
+  // -
   snapshot.save();
 }
 
@@ -270,9 +321,16 @@ export function newSnapshot(
  */
 
 export function handleSetAccessManager(event: SetAccessManager): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.accessManager = event.params.newAccessManager;
+
+  // -
   factory.save();
 }
 
@@ -283,9 +341,16 @@ export function handleSetAccessManager(event: SetAccessManager): void {
  */
 
 export function handleSetFeesManager(event: SetFeesManager): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.feesManager = event.params.newFeesManager;
+
+  // -
   factory.save();
 }
 
@@ -296,9 +361,16 @@ export function handleSetFeesManager(event: SetFeesManager): void {
  */
 
 export function handleSetHarvester(event: SetHarvester): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.harvester = event.params.newHarvester;
+
+  // -
   factory.save();
 
 }
@@ -310,10 +382,17 @@ export function handleSetHarvester(event: SetHarvester): void {
  */
 
 export function handleSetSwapContracts(event: SetSwapContracts): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.swapProxy = event.params.newSwapProxy;
   factory.swapRouter = event.params.newSwapRouter;
+
+  // -
   factory.save();
 }
 
@@ -324,13 +403,22 @@ export function handleSetSwapContracts(event: SetSwapContracts): void {
  */
 
 export function handleAddTokensAndPriceFeeds(event: AddTokensAndPriceFeeds): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // ? bind factory
   const factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
-  const currentTokens = factoryContract.getWhitelistedTokens();  // Post Remove
+
+  // source factory data
+  const currentTokens = factoryContract.getWhitelistedTokens();
   const tmp = new Array<Bytes>(currentTokens.length);
-  for (let x = 0; x < currentTokens.length; x++) tmp[x] = currentTokens[x];
+  for (let tIndex = 0; tIndex < currentTokens.length; tIndex++) tmp[tIndex] = currentTokens[tIndex];
   factory.tokens = tmp;
+
+  // -
   factory.save();
 }
 
@@ -341,13 +429,20 @@ export function handleAddTokensAndPriceFeeds(event: AddTokensAndPriceFeeds): voi
  */
 
 export function handleRemoveTokensAndPriceFeeds(event: RemoveTokensAndPriceFeeds): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source factory data
   const factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
-  const currentTokens = factoryContract.getWhitelistedTokens();  // Post Remove
+  const currentTokens = factoryContract.getWhitelistedTokens();
   const tmp = new Array<Bytes>(currentTokens.length);
-  for (let x = 0; x < currentTokens.length; x++) tmp[x] = currentTokens[x];
+  for (let tIndex = 0; tIndex < currentTokens.length; tIndex++) tmp[tIndex] = currentTokens[tIndex];
   factory.tokens = tmp;
+
+  // -
   factory.save();
 }
 
@@ -363,7 +458,7 @@ export function handleSetSwapAdapter(event: SetSwapAdapter): void {
   // prevent further processing
   if (factory === null) return;
 
-  // -
+  // source event data
   factory.swapAdapter = event.params.newSwapAdapter;
 
   // save
@@ -392,10 +487,10 @@ export function handleNewBlock(block: ethereum.Block): void {
 
   // fn state
   const factoryStorage = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
+
+  // source factory data
   const factoryState = factoryStorage.getFactoryState();
   const vaults = factoryState.value0;
-
-  // for each vault
   for (let vIndex = 0; vIndex < vaults.length; vIndex++) {
     const vAddress = vaults[vIndex];
 
@@ -413,6 +508,8 @@ export function handleNewBlock(block: ethereum.Block): void {
   }
   factory.lastSnapshotBlockTimestamp = block.timestamp;
   factory.lastSnapshotBlockNumber = block.number;
+
+  // -
   factory.save();
 }
 
