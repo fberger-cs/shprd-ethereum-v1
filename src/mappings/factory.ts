@@ -32,7 +32,7 @@ export function _createFactory(event: VaultCreated): Factory {
   const factory = new Factory(FACTORY_ADDRESS);
 
   // prevent error
-	if (factory === null) return;
+	// if (factory === null) return;
 
   // set
   factory.vaultCount = 0;
