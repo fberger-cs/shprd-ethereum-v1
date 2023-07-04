@@ -9,35 +9,44 @@ import {
   RemoveTokensAndPriceFeeds,
   SetSwapAdapter,
   OwnershipTransferred,
-} from "../types/Factory/Factory";
-
+} from "../types/Factory";
 import { Vault, Factory } from '../types/schema';
 import { Vault as VaultContract } from "../types/Factory/Vault";
 import { Factory as FactoryContract } from "../types/Factory/Factory";
 import { Vault as VaultTemplate } from "../types/templates";
 import { FACTORY_ADDRESS, ZERO_BI, SNAPSHOT_TIMEFRAME } from './helpers';
 import { VaultSnapshot } from "../types/schema";
-
 import { store } from '@graphprotocol/graph-ts'
 
 
 /**
- * This function should be called only once at the first vault created, when the subgraph isn't yet deployed
+ * This function should be called only once when the first vault is created and subgraph isn't yet deployed
  * @param event The vault creation event
  * @returns The create factory entity
  */
+
 export function _createFactory(event: VaultCreated): Factory {
   log.debug("CALL : _createFactory", []);
+
+  // load
   const factory = new Factory(FACTORY_ADDRESS);
+
+  // prevent error
+	// if (factory === null) return;
+
+  // set
   factory.vaultCount = 0;
+
+  // ? bind
   const bindedFactory = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
-  // Tokens
+
+  // source binded factory data
   const tokens = bindedFactory.getWhitelistedTokens();
   const tokensArray = new Array<Bytes>(tokens.length);
-  for (let x = 0; x < tokens.length; x++) tokensArray[x] = tokens[x];
+  for (let tIndex = 0; tIndex < tokens.length; tIndex++) tokensArray[tIndex] = tokens[tIndex];
   factory.tokens = tokensArray;
-  factory.tokens = [];
-  // Other Addresses
+
+  // source factory data
   factory.feesManager = bindedFactory.feesManager();
   factory.accessManager = bindedFactory.accessManager();
   factory.harvester = bindedFactory.harvester();
@@ -46,8 +55,11 @@ export function _createFactory(event: VaultCreated): Factory {
   factory.swapAdapter = bindedFactory.swapAdapter();
   factory.lastSnapshotBlockTimestamp = event.block.timestamp;
   factory.lastSnapshotBlockNumber = event.block.number;
+
+  // save
   factory.save();
 
+  // -
   return factory;
 }
 
@@ -55,72 +67,69 @@ export function _createFactory(event: VaultCreated): Factory {
  * Update the full content of a vault
  * @param vAddress His address
  * @param vault The instance itself
- * @returns 
+ * @returns /
  */
+
 export const updateVault = (vault: Vault): Vault => {
   log.debug("CALL : updateVault", []);
 
-  // const vAddress = Address.fromString(vault.id)
+  // ? bind
   const bindedFactory = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
   const bindedVault = VaultContract.bind(Address.fromString(vault.id));
 
-  // Vault State
+  // source binded factory data
   const vaultState = bindedFactory.getVaultState(Address.fromString(vault.id));
-  // Share State
   const shareState = bindedFactory.getShareState(Address.fromString(vault.id));
 
-  // Update Vault Storage
+  // source binded vault data > tokens
   const tokensLength = bindedVault.tokensLength().toI32();
   const tokens = new Array<Bytes>(tokensLength);
   const tokensPriceFeedAddress = new Array<Bytes>(tokensLength); // String != string
   const tokensPriceFeedPrecision = new Array<BigInt>(tokensLength);
   const tokensDenominator = new Array<BigInt>(tokensLength);
-  for (let x = 0; x < tokensLength; x++) {
-    const tokenData = bindedVault.tokens(BigInt.fromI32(x));
-    tokens[x] = tokenData.value0
-    tokensPriceFeedAddress[x] = tokenData.value1;
-    tokensPriceFeedPrecision[x] = BigInt.fromI32(tokenData.value2);
-    tokensDenominator[x] = tokenData.value3;
+  for (let tIndex = 0; tIndex < tokensLength; tIndex++) {
+    const tokenData = bindedVault.tokens(BigInt.fromI32(tIndex));
+    tokens[tIndex] = tokenData.value0
+    tokensPriceFeedAddress[tIndex] = tokenData.value1;
+    tokensPriceFeedPrecision[tIndex] = BigInt.fromI32(tokenData.value2);
+    tokensDenominator[tIndex] = tokenData.value3;
   };
-
   vault.tokens = tokens;
   vault.tokensPriceFeedAddress = tokensPriceFeedAddress
   vault.tokensPriceFeedPrecision = tokensPriceFeedPrecision;
   vault.tokensDenominator = tokensDenominator;
 
-  // log.debug("CALL :  bindedFactory._address: {}", [bindedFactory._address.toHexString()]);
-  // log.debug("CALL :  bindedFactory._name: {}", [bindedFactory._name]);
-  // log.debug("CALL :  bindedFactory.harvester: {}", [bindedFactory.harvester().toHexString()]);
+  // legacy debug
+  // log.debug("CALL:  bindedFactory._address: {}", [bindedFactory._address.toHexString()]);
+  // log.debug("CALL:  bindedFactory._name: {}", [bindedFactory._name]);
+  // log.debug("CALL:  bindedFactory.harvester: {}", [bindedFactory.harvester().toHexString()]);
 
-  // RoLes
-
-  const vaultRoLes = bindedFactory.getRolesPerVault(Address.fromString(vault.id));
-
-  const admins = new Array<Bytes>(vaultRoLes.value1.length);
-  const strategists = new Array<Bytes>(vaultRoLes.value2.length);
-  const harvesters = new Array<Bytes>(vaultRoLes.value3.length);
-  for (let x = 0; x < vaultRoLes.value1.length; x++) admins[x] = vaultRoLes.value1[x];
-  for (let x = 0; x < vaultRoLes.value2.length; x++) strategists[x] = vaultRoLes.value2[x];
-  for (let x = 0; x < vaultRoLes.value3.length; x++) harvesters[x] = vaultRoLes.value3[x];
-
+  // source binded vault data > roles
+  const vaultRoles = bindedFactory.getRolesPerVault(Address.fromString(vault.id));
+  const admins = new Array<Bytes>(vaultRoles.value1.length);
+  const strategists = new Array<Bytes>(vaultRoles.value2.length);
+  const harvesters = new Array<Bytes>(vaultRoles.value3.length);
+  for (let rIndex = 0; rIndex < vaultRoles.value1.length; rIndex++) admins[rIndex] = vaultRoles.value1[rIndex];
+  for (let rIndex = 0; rIndex < vaultRoles.value2.length; rIndex++) strategists[rIndex] = vaultRoles.value2[rIndex];
+  for (let rIndex = 0; rIndex < vaultRoles.value3.length; rIndex++) harvesters[rIndex] = vaultRoles.value3[rIndex];
   vault.admins = admins;
   vault.strategists = strategists;
   vault.harvesters = harvesters;
 
-  // Config Props
+  // source binded vault data > config
   const configProps = bindedVault.getConfigProps();
   vault.paused = configProps.paused;
   vault.verified = configProps.verified;
   vault.name = configProps.name;
   vault.description = configProps.description;
 
-  // Constant Props
+  // source binded vault data > constants
   const constantProps = bindedVault.getConstantProps();
   vault.factoryAddress = constantProps.factory;
   vault.createdAt = constantProps.createdAt;
   vault.share = constantProps.share;
 
-  // Fees Props
+  // source binded vault data > fees
   const feesProps = bindedVault.getFeesProps();
   vault.beneficiary = feesProps.beneficiary; // Strange
   vault.exitFees = feesProps.exitFees;
@@ -129,14 +138,14 @@ export const updateVault = (vault: Vault): Vault => {
   vault.performanceFeesRate = feesProps.performanceFeesRate;
   vault.performanceFeesToStrategist = feesProps.performanceFeesToStrategist;
 
-  // History Props
+  // source binded vault data > history
   const historyProps = bindedVault.getHistoryProps();
   vault.highWaterMark = historyProps.highWaterMark;
   vault.prevRebalanceSignals = historyProps.prevRebalanceSignals;
   vault.prevSwap = historyProps.prevSwap;
   vault.prevMngHarvest = historyProps.prevMngHarvest;
 
-  // Security Props
+  // source binded vault data > security
   const securityProps = bindedVault.getSecurityProps();
   vault.maxAUM = securityProps.maxAUM;
   vault.maxLossSwap = securityProps.maxLossSwap;
@@ -146,7 +155,7 @@ export const updateVault = (vault: Vault): Vault => {
   vault.minSecurityTime = securityProps.minSecurityTime;
   vault.minHarvestThreshold = securityProps.minHarvestThreshold;
 
-  // State Left
+  // source binded vault data > fees compute
   const sharePrice = vaultState.value9;
   const pendingPerfFees = bindedVault.getPerformanceFees().value0;
   const pendingManagementFees = bindedVault.getManagementFees().value0;
@@ -160,7 +169,11 @@ export const updateVault = (vault: Vault): Vault => {
   vault.netSharePrice = (shareSupply == BigInt.fromI32(0)) ?  BigInt.fromI32(1) : sharePrice.times(shareSupply).div(shareSupply.plus(pendingManagementFees).plus(pendingPerfFees));
   vault.sharePriceNetFromMngFees = (shareSupply == BigInt.fromI32(0)) ? BigInt.fromI32(1) : sharePrice.times(shareSupply).div(shareSupply.plus(pendingManagementFees));
   vault.sharePriceNetFromPerfFees = (shareSupply == BigInt.fromI32(0)) ? BigInt.fromI32(1) : sharePrice.times(shareSupply).div(shareSupply.plus(pendingPerfFees));
+
+  // save
   vault.save();
+
+  // -
   return vault;
 }
 
@@ -169,9 +182,12 @@ export const updateVault = (vault: Vault): Vault => {
  * @param event Event of creation
  * @param factory Factory instance
  */
+
 export function _createVault(event: VaultCreated, factory: Factory): Vault {
-  /// Factory Info
+  // ?
   let vault = new Vault(event.params.vault.toHexString()) as Vault;
+
+  // source vault data
   vault.factory = factory.id;
   vault.vault = event.params.vault;
   vault.creator = event.transaction.from;
@@ -186,8 +202,14 @@ export function _createVault(event: VaultCreated, factory: Factory): Vault {
   vault.netSharePrice = BigInt.fromI32(1);
   vault.sharePriceNetFromMngFees = BigInt.fromI32(1);
   vault.sharePriceNetFromPerfFees = BigInt.fromI32(1);
+
+  // -
   const updatedVault = updateVault(vault);
+
+  // -
   updatedVault.save();
+
+  // ?
   return vault;
 }
 
@@ -195,17 +217,32 @@ export function _createVault(event: VaultCreated, factory: Factory): Vault {
  * Create a vault, via the factory event
  * @param event /
  */
+
 export function handleCreateVault(event: VaultCreated): void {
   log.debug("CALL : handleCreateVault", []);
-  // Factory (created when the first vault is created)
+
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
+
+  // prevent error
   if (factory === null) factory = _createFactory(event);
+
+  // -
   factory.vaultCount = factory.vaultCount + 1;
+
+  // save
   factory.save();
-  // Vault
+
+  // -
   const vault = _createVault(event, factory);
+
+  // -
   VaultTemplate.create(event.params.vault);
+
+  // -
   vault.save();
+
+  // -
   factory.save();
 }
 
@@ -216,15 +253,26 @@ export function handleCreateVault(event: VaultCreated): void {
  * @param block Block of the event
  * @param triggeredByEvent Wethever the snapshot is triggered by an event or the `handbleBlock` handler. To be used in the frontend possibly
  */
+
 export function newSnapshot(
   factory: Factory,
   vaultAddress: Address,
   block: ethereum.Block,
   triggeredByEvent: boolean,
 ): void {
+  // load
   const vault = VaultContract.bind(vaultAddress);
+
+  // prevent error
+	// if (factory === null) return;
+
+  // load binded factory
   const bindedFactory = FactoryContract.bind(Address.fromString(factory.id));
+
+  // ? build name
   const entityName = FACTORY_ADDRESS + "-" + vaultAddress.toHexString() + "-" + block.number.toString();
+
+  // source vault data
   const status = vault.getVaultStatus();
   const tokensLength = vault.tokensLength().toI32();
   const assetsPrices = new Array<BigInt>(tokensLength);
@@ -234,14 +282,18 @@ export function newSnapshot(
   const pendingPerfFees = vault.getPerformanceFees().value0;
   const pendingManagementFees = vault.getManagementFees().value0;
   const shareSupply = shareState.value4;
-  for (let y = 0; y < tokensLength; y++) {
-    const asset = vault.tokens(BigInt.fromI32(y));
+  for (let tIndex = 0; tIndex < tokensLength; tIndex++) {
+    const asset = vault.tokens(BigInt.fromI32(tIndex));
     const price = vault.getLatestPrice(asset.value1);
-    assetsPrices[y] = price;
-    newTokens[y] = asset.value0;
+    assetsPrices[tIndex] = price;
+    newTokens[tIndex] = asset.value0;
   }
   const assetsBalances = vault.getVaultBalances();
+
+  // load
   const snapshot = new VaultSnapshot(entityName);
+
+  // source snapshot data
   snapshot.factory = factory.id;
   snapshot.vault = vaultAddress.toHexString();
   snapshot.assetsBalances = assetsBalances;
@@ -257,6 +309,8 @@ export function newSnapshot(
   snapshot.pendingMngFees = pendingManagementFees;
   snapshot.timestamp = block.timestamp;
   snapshot.triggeredByEvent = triggeredByEvent;
+
+  // -
   snapshot.save();
 }
 
@@ -265,10 +319,18 @@ export function newSnapshot(
  * @param event /
  * @returns /
  */
+
 export function handleSetAccessManager(event: SetAccessManager): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.accessManager = event.params.newAccessManager;
+
+  // -
   factory.save();
 }
 
@@ -277,10 +339,18 @@ export function handleSetAccessManager(event: SetAccessManager): void {
  * @param event /
  * @returns /
  */
+
 export function handleSetFeesManager(event: SetFeesManager): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.feesManager = event.params.newFeesManager;
+
+  // -
   factory.save();
 }
 
@@ -289,10 +359,18 @@ export function handleSetFeesManager(event: SetFeesManager): void {
  * @param event /
  * @returns /
  */
+
 export function handleSetHarvester(event: SetHarvester): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.harvester = event.params.newHarvester;
+
+  // -
   factory.save();
 
 }
@@ -302,11 +380,19 @@ export function handleSetHarvester(event: SetHarvester): void {
  * @param event /
  * @returns /
  */
+
 export function handleSetSwapContracts(event: SetSwapContracts): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source event data
   factory.swapProxy = event.params.newSwapProxy;
   factory.swapRouter = event.params.newSwapRouter;
+
+  // -
   factory.save();
 }
 
@@ -315,14 +401,24 @@ export function handleSetSwapContracts(event: SetSwapContracts): void {
  * @param event /
  * @returns /
  */
+
 export function handleAddTokensAndPriceFeeds(event: AddTokensAndPriceFeeds): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // ? bind factory
   const factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
-  const currentTokens = factoryContract.getWhitelistedTokens();  // Post Remove
+
+  // source factory data
+  const currentTokens = factoryContract.getWhitelistedTokens();
   const tmp = new Array<Bytes>(currentTokens.length);
-  for (let x = 0; x < currentTokens.length; x++) tmp[x] = currentTokens[x];
+  for (let tIndex = 0; tIndex < currentTokens.length; tIndex++) tmp[tIndex] = currentTokens[tIndex];
   factory.tokens = tmp;
+
+  // -
   factory.save();
 }
 
@@ -331,55 +427,89 @@ export function handleAddTokensAndPriceFeeds(event: AddTokensAndPriceFeeds): voi
  * @param event /
  * @returns /
  */
+
 export function handleRemoveTokensAndPriceFeeds(event: RemoveTokensAndPriceFeeds): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent errors
+  if (factory === null) return;
+
+  // source factory data
   const factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
-  const currentTokens = factoryContract.getWhitelistedTokens();  // Post Remove
+  const currentTokens = factoryContract.getWhitelistedTokens();
   const tmp = new Array<Bytes>(currentTokens.length);
-  for (let x = 0; x < currentTokens.length; x++) tmp[x] = currentTokens[x];
+  for (let tIndex = 0; tIndex < currentTokens.length; tIndex++) tmp[tIndex] = currentTokens[tIndex];
   factory.tokens = tmp;
+
+  // -
   factory.save();
 }
 
 /**
- * 
- * @param event 
- * @returns 
+ * @param event
+ * @returns
  */
+
 export function handleSetSwapAdapter(event: SetSwapAdapter): void {
+  // load
   let factory = Factory.load(FACTORY_ADDRESS);
-  if (factory === null) return; // Not possible
+
+  // prevent further processing
+  if (factory === null) return;
+
+  // source event data
   factory.swapAdapter = event.params.newSwapAdapter;
+
+  // save
   factory.save();
 }
 
 /**
  * New block handler
- * We also 
  * @notice It's normal that the graph will create tons of snapshots during the deploy/sync time, because it look over tons of past blocks
  * @param block Current Block
  * @returns /
  */
+
 export function handleNewBlock(block: ethereum.Block): void {
+  // load
   const factory = Factory.load(FACTORY_ADDRESS);
+
+  // prevent further processing
   if (factory === null) {
     log.debug("handleNewBlock : No Factory yet", []);
     return;
   }
+
+  // prevent further processing
   if (!snapshotOrNot(block) == false) return;
+
+  // fn state
   const factoryStorage = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
+
+  // source factory data
   const factoryState = factoryStorage.getFactoryState();
   const vaults = factoryState.value0;
-  for (let x = 0; x < vaults.length; x++) {
-    const vAddress = vaults[x];
+  for (let vIndex = 0; vIndex < vaults.length; vIndex++) {
+    const vAddress = vaults[vIndex];
+
+    // -
     newSnapshot(factory, vAddress, block, false);
+
+    // load
     let vault = Vault.load(vAddress.toHexString());
+
+    // prevent further processing
     if (vault === null) continue;
+
+    // -
     updateVault(vault);
   }
   factory.lastSnapshotBlockTimestamp = block.timestamp;
   factory.lastSnapshotBlockNumber = block.number;
+
+  // -
   factory.save();
 }
 
@@ -389,26 +519,43 @@ export function handleNewBlock(block: ethereum.Block): void {
  * @param block /
  * @returns /
  */
+
 export function snapshotOrNot(block: ethereum.Block): boolean {
+  // load
   const factory = Factory.load(FACTORY_ADDRESS);
+
+  // prevent further processing
   if (factory === null) {
     log.debug("snapshotOrNot : No Factory yet", []);
     return false
   }
+
+  // fn state
   const lastSnapTimestamp = factory.lastSnapshotBlockTimestamp;
   const currentTime = block.timestamp;
   const elaspedTime = currentTime.minus(lastSnapTimestamp)
+
+  // compare
   const skipSnapshot = elaspedTime.le(SNAPSHOT_TIMEFRAME);
+
+  // debug
   // log.debug("CALL : currentTime: {}", [currentTime.toString()]);
   // log.debug("CALL : lastSnapTimestamp: {}", [lastSnapTimestamp.toString()]);
   // log.debug("CALL : elaspedTime: {}", [elaspedTime.toString()]);
   // log.debug("CALL : SNAPSHOT_TIMEFRAME: {}", [SNAPSHOT_TIMEFRAME.toString()]);
   // log.debug("CALL : skipSnapshot: {}", [skipSnapshot.toString()]);
+
+  // -
   return skipSnapshot;
 }
 
 export function handleOwnershipTransferred(event: OwnershipTransferred): void {
+  // load
   const factory = Factory.load(FACTORY_ADDRESS);
+
+  // prevent further processing
   if (factory === null) return;
+
+  // -
   // Nothing to do. We don't store the owner
 }
