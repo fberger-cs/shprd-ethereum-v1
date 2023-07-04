@@ -4,10 +4,10 @@
 # 3. address : Factory
 # 4. package.json
 
-# Deployed to <tba>
+# Deployed to https://thegraph.com/explorer/subgraph/fberger-cs/shprd-ethereum-v1
 # Subgraph endpoints
-# Queries (HTTP): <tba>
-# Subscriptions (WS): <tba>
+# Queries (HTTP): https://api.thegraph.com/subgraphs/name/fberger-cs/shprd-ethereum-v1
+# Subscriptions (WS): wss://api.thegraph.com/subgraphs/name/fberger-cs/shprd-ethereum-v1
 
 specVersion: 0.0.4
 description: Shprd - The Asset Manager of Web3

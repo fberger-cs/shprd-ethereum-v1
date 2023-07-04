@@ -264,7 +264,7 @@ export function newSnapshot(
   const vault = VaultContract.bind(vaultAddress);
 
   // prevent error
-	if (factory === null) return;
+	// if (factory === null) return;
 
   // load binded factory
   const bindedFactory = FactoryContract.bind(Address.fromString(factory.id));
