@@ -41,7 +41,7 @@ export function _createFactory(event: VaultCreated): Factory {
   const bindedFactory = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
 
   // source binded factory data
-  const tokens = bindedFactory.getWhitelistedTokens();
+  const tokens = bindedFactory.try_getWhitelistedTokens().value ?? [];
   const tokensArray = new Array<Bytes>(tokens.length);
   for (let x = 0; x < tokens.length; x++) tokensArray[x] = tokens[x];
   factory.tokens = tokensArray;
@@ -413,7 +413,7 @@ export function handleAddTokensAndPriceFeeds(event: AddTokensAndPriceFeeds): voi
   const factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
 
   // source factory data
-  const currentTokens = factoryContract.getWhitelistedTokens();
+  const currentTokens = factoryContract.try_getWhitelistedTokens().value ?? [];
   const tmp = new Array<Bytes>(currentTokens.length);
   for (let tIndex = 0; tIndex < currentTokens.length; tIndex++) tmp[tIndex] = currentTokens[tIndex];
   factory.tokens = tmp;
@@ -437,7 +437,7 @@ export function handleRemoveTokensAndPriceFeeds(event: RemoveTokensAndPriceFeeds
 
   // source factory data
   const factoryContract = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
-  const currentTokens = factoryContract.getWhitelistedTokens();
+  const currentTokens = factoryContract.try_getWhitelistedTokens().value ?? [];
   const tmp = new Array<Bytes>(currentTokens.length);
   for (let tIndex = 0; tIndex < currentTokens.length; tIndex++) tmp[tIndex] = currentTokens[tIndex];
   factory.tokens = tmp;
