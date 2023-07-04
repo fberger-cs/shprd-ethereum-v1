@@ -32,10 +32,11 @@ export function _createFactory(event: VaultCreated): Factory {
   factory.vaultCount = 0;
   const bindedFactory = FactoryContract.bind(Address.fromString(FACTORY_ADDRESS));
   // Tokens
-  const tokens = bindedFactory.getWhitelistedTokens();
-  const tokensArray = new Array<Bytes>(tokens.length);
-  for (let x = 0; x < tokens.length; x++) tokensArray[x] = tokens[x];
-  factory.tokens = tokensArray;
+  // const tokens = bindedFactory.getWhitelistedTokens();
+  // const tokensArray = new Array<Bytes>(tokens.length);
+  // for (let x = 0; x < tokens.length; x++) tokensArray[x] = tokens[x];
+  // factory.tokens = tokensArray;
+  factory.tokens = [];
   // Other Addresses
   factory.feesManager = bindedFactory.feesManager();
   factory.accessManager = bindedFactory.accessManager();
