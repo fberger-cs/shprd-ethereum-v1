@@ -20,7 +20,7 @@ dataSources:
       source:
           abi: Factory
           address: "0xF14c4B935054b8D1017Ad96c9a265EB7F8ECF13c" # TODO
-          startBlock: 17614392 # TODO
+          startBlock: 17614391 # TODO
       mapping:
           kind: ethereum/events
           apiVersion: 0.0.6
